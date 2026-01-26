@@ -75,7 +75,7 @@ $$
 \frac{1}{1+\omega_y}\cdot \frac{\omega_x}{1+\omega_x} \cdot S(\omega_x,\omega_y)\cdot N(\omega_x,\omega_y) = \frac{1}{1+\omega}\cdot \frac{\omega}{1+\omega} \cdot S(\omega,\omega)\cdot N(\omega,\omega)
 $$
 
-$\omega$가 0에 수렴하면 $\frac{\omega}{(1+\omega)^2} $ 또한 0에 수렴한다.
+$\omega$가 0에 수렴하면 $\frac{ \omega }{(1+ \omega )^2}$ 또한 0에 수렴한다.
 
 따라서 $\omega$가 충분히 작은 상황에서 
 $\left(K(\omega_y) \cdot S(\omega_x,\omega_y)\right) *_{\omega_x,\omega_y} \left(G(\omega_x) \cdot N(\omega_x,\omega_y)\right) $은 0 으로 수렴한다.
