@@ -5,17 +5,17 @@ V(z) = U(z)\cdot\frac{H(z)}{1+H(z)}+Q(z)\cdot\frac{1}{1+H(z)}
 $$
 
 $$
-V(w) = K(w)\cdot U(w) + \left(1-K(w)\right)\cdot Q(w)
+V(\omega) = K(\omega)\cdot U(\omega) + \left(1-K(\omega)\right)\cdot Q(\omega)
 $$
 
 각 필터는 각 축에만 종속적이므로
 
 $$
-V(w_x, y) = K(w_x,y)\cdot U(w_x,y) + \left(1-K(w_x,y)\right)\cdot Q(w_x,y)
+V(\omega_x, y) = K(\omega_x,y)\cdot U(\omega_x,y) + \left(1-K(\omega_x,y)\right)\cdot Q(\omega_x,y)
 $$
 
 $$
-V(w_x, y) = K(w_x)\cdot U(w_x,y) + \left(1-K(w_x)\right)\cdot Q(w_x,y)
+V(\omega_x, y) = K(\omega_x)\cdot U(\omega_x,y) + \left(1-K(\omega_x)\right)\cdot Q(\omega_x,y)
 $$
 
 $$
@@ -43,44 +43,44 @@ $$
 $$
 
 $$
-\left(K(w_x) \cdot S(w_x,w_y)\right) *_{w_x,w_y} \left(G(w_y) \cdot N(w_x,w_y)\right)
+\left(K(\omega_x) \cdot S(\omega_x,\omega_y)\right) *_{\omega_x,\omega_y} \left(G(\omega_y) \cdot N(\omega_x,\omega_y)\right)
 $$
 
 $$
 O =
-(K(w_x) \cdot S(w_x,w_y))*_{w_x,w_y} (K(w_y) \cdot S(w_x,w_y)) + \left(K(w_x) \cdot S(w_x,w_y)\right) *_{w_x,w_y} \left(G(w_y) \cdot N(w_x,w_y)\right) +
-\left(K(w_y) \cdot S(w_x,w_y)\right) *_{w_x,w_y} \left(G(w_x) \cdot N(w_x,w_y)\right) + (G(w_x) \cdot N(w_x,w_y))*_{w_x,w_y}(G(w_y) \cdot N(w_x,w_y))
+(K(\omega_x) \cdot S(\omega_x,\omega_y)) *_{\omega_x,\omega_y} (K(\omega_y) \cdot S(\omega_x,\omega_y)) + \left(K(\omega_x) \cdot S(\omega_x,\omega_y)\right) *_{\omega_x,\omega_y} \left(G(\omega_y) \cdot N(\omega_x,\omega_y)\right) +
+\left(K(\omega_y) \cdot S(\omega_x,\omega_y)\right) *_{\omega_x,\omega_y} \left(G(\omega_x) \cdot N(\omega_x,\omega_y)\right) + (G(\omega_x) \cdot N(\omega_x,\omega_y)) *_{\omega_x,\omega_y} (G(\omega_y) \cdot N(\omega_x,\omega_y))
 $$
 
 이때
 low freq 에서 convolution과 mutiply는 근사하므로,
 
 $$
-\left(K(w_y) \cdot S(w_x,w_y)\right) *_{w_x,w_y} \left(G(w_x) \cdot N(w_x,w_y)\right)  \approx \left(K(w_y) \cdot S(w_x,w_y)\right) \cdot \left(G(w_x) \cdot N(w_x,w_y)\right) 
+\left(K(\omega_y) \cdot S(\omega_x,\omega_y)\right) *_{\omega_x,\omega_y} \left(G(\omega_x) \cdot N(\omega_x,\omega_y)\right)  \approx \left(K(\omega_y) \cdot S(\omega_x,\omega_y)\right) \cdot \left(G(\omega_x) \cdot N(\omega_x,\omega_y)\right) 
 $$
 
 $$
-\left(K(w_y) \cdot S(w_x,w_y)\right) \cdot \left(G(w_x) \cdot N(w_x,w_y)\right) = K(w_y) \cdot S(w_x,w_y) \cdot G(w_x) \cdot N(w_x,w_y)\\
-= K(w_y) \cdot S(w_x,w_y) \cdot \left(1-K(w_x)\right)\cdot N(w_x,w_y)
+\left(K(\omega_y) \cdot S(\omega_x,\omega_y)\right) \cdot \left(G(\omega_x) \cdot N(\omega_x,\omega_y)\right) = K(\omega_y) \cdot S(\omega_x,\omega_y) \cdot G(\omega_x) \cdot N(\omega_x,\omega_y)\\
+= K(\omega_y) \cdot S(\omega_x,\omega_y) \cdot \left(1-K(\omega_x)\right)\cdot N(\omega_x,\omega_y)
 $$
 
 1차 DSM에서
-$H = 1/w $, then $K=\frac{1}{1+w}$, $1-K = \frac{w}{1+w}$
+$H = 1/\omega $, then $K=\frac{1}{1+\omega}$, $1-K = \frac{\omega}{1+\omega}$
 
 $$ 
-\therefore \left(K(w_y) \cdot S(w_x,w_y)\right) *_{w_x,w_y} \left(G(w_x) \cdot N(w_x,w_y)\right)  \approx \frac{1}{1+w_y}\cdot \frac{w_x}{1+w_x} \cdot S(w_x,w_y)\cdot N(w_x,w_y)
+\therefore \left(K(\omega_y) \cdot S(\omega_x,\omega_y)\right) *_{\omega_x,\omega_y} \left(G(\omega_x) \cdot N(\omega_x,\omega_y)\right)  \approx \frac{1}{1+\omega_y}\cdot \frac{\omega_x}{1+\omega_x} \cdot S(\omega_x,\omega_y)\cdot N(\omega_x,\omega_y)
 $$
-이때 공간에 대한 주파수를 고려해보면, 축적이 왜곡되지 않는 상황에서는 $w_x = w_y$가 성립한다.
+이때 공간에 대한 주파수를 고려해보면, 축적이 왜곡되지 않는 상황에서는 $\omega_x = \omega_y$가 성립한다.
 $$ 
-\frac{1}{1+w_y}\cdot \frac{w_x}{1+w_x} \cdot S(w_x,w_y)\cdot N(w_x,w_y) = \frac{1}{1+w}\cdot \frac{w}{1+w} \cdot S(w,w)\cdot N(w,w)
+\frac{1}{1+\omega_y}\cdot \frac{\omega_x}{1+\omega_x} \cdot S(\omega_x,\omega_y)\cdot N(\omega_x,\omega_y) = \frac{1}{1+\omega}\cdot \frac{\omega}{1+\omega} \cdot S(\omega,\omega)\cdot N(\omega,\omega)
 $$
 
-$w$가 0에 수렴하면 $\frac{w}{(1+w)^2} $ 또한 0에 수렴한다.
+$\omega$가 0에 수렴하면 $\frac{\omega}{(1+\omega)^2} $ 또한 0에 수렴한다.
 
-따라서 $w$가 충분히 작은 상황에서 
-$\left(K(w_y) \cdot S(w_x,w_y)\right) *_{w_x,w_y} \left(G(w_x) \cdot N(w_x,w_y)\right) $은 0 으로 수렴한다.
+따라서 $\omega$가 충분히 작은 상황에서 
+$\left(K(\omega_y) \cdot S(\omega_x,\omega_y)\right) *_{\omega_x,\omega_y} \left(G(\omega_x) \cdot N(\omega_x,\omega_y)\right) $은 0 으로 수렴한다.
 
 $$
 \therefore O \approx
-(K(w_x) \cdot S(w_x,w_y))*_{w_x,w_y} (K(w_y) \cdot S(w_x,w_y)) 
+(K(\omega_x) \cdot S(\omega_x,\omega_y))*_{\omega_x,\omega_y} (K(\omega_y) \cdot S(\omega_x,\omega_y)) 
 $$
