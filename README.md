@@ -49,8 +49,6 @@ $$
 $$
 O =
 (K(w_x) \cdot S(w_x,w_y))*_{w_x,w_y} (K(w_y) \cdot S(w_x,w_y)) + \left(K(w_x) \cdot S(w_x,w_y)\right) *_{w_x,w_y} \left(G(w_y) \cdot N(w_x,w_y)\right) +
-$$
-$$
 \left(K(w_y) \cdot S(w_x,w_y)\right) *_{w_x,w_y} \left(G(w_x) \cdot N(w_x,w_y)\right) + (G(w_x) \cdot N(w_x,w_y))*_{w_x,w_y}(G(w_y) \cdot N(w_x,w_y))
 $$
 
