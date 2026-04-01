@@ -55,28 +55,30 @@ def dsm_conv_image_modulation(image_path, order=1, bit=3):
 
     dim = 2
     image_array = np.array(image, dtype=np.float64)
-    image_array = np.float_power(image_array, 1 / dim)
     maximum = float(np.max(image_array))
+
+    working_array = image_array.copy()
+    img = [None] * bit
+    for i in range(bit-1):
+        local_max = maximum/np.power(2,bit-1-i)
+        img[i] = working_array % (local_max)
+        working_array -= img[i]
+        img[i] /= local_max 
+        img[i] = np.float_power(img[i], 1 / dim) 
+    img[bit-1] = image_array/maximum
+
     print(f"maximum: {maximum}")
+    return_dtype = _packed_dtype(bit)
+    rt_array = np.zeros_like(image_array, dtype=return_dtype)
 
-    if maximum > 0:
-        normalized_image = image_array / maximum
-    else:
-        normalized_image = np.zeros_like(image_array)
+    print(f"Image as NumPy array shape: {image_array.shape}, dtype: {image_array.dtype}")
 
-    levels = (1 << bit) - 1
-    packed_dtype = _packed_dtype(bit)
-    quantized_levels = np.rint(normalized_image * levels).astype(packed_dtype)
-    rt_array = np.zeros_like(quantized_levels, dtype=packed_dtype)
-
-    print(f"Image as NumPy array shape: {normalized_image.shape}, dtype: {normalized_image.dtype}")
-
-    for level in range(bit):
-        bit_plane = ((quantized_levels >> level) & 1).astype(np.float64)
+    for i in range(bit):
+        bit_plane = img[i].astype(np.float64)
         w_array = _apply_dsm_along_axis(bit_plane, axis=0, order=order)
         h_array = _apply_dsm_along_axis(bit_plane, axis=1, order=order)
         mul_array = w_array * h_array
-        rt_array |= mul_array.astype(packed_dtype) << level
+        rt_array |= mul_array.astype(return_dtype) << i
 
     np.save("mul_array_" + image_path + ".npy", rt_array)
     print(f"mul_array shape: {rt_array.shape}, dtype: {rt_array.dtype}")
