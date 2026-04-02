@@ -20,7 +20,6 @@ def raw_dsm_print(image_path, maximum=255, dim=2, bit=3):
         # _local_max += local_max
         reconstructed_image += ((loaded_array >> i) & 1) * local_max
     # reconstructed_image = maximum * reconstructed_image / _local_max
-    reconstructed_image = np.clip(np.rint(reconstructed_image), 0, 255).astype(np.uint8)
+    reconstructed_image = np.rint(reconstructed_image).astype(np.uint32)
     print(f"Raw image mul shape: {reconstructed_image.shape}, dtype: {reconstructed_image.dtype}")
-    image = Image.fromarray(reconstructed_image, mode="RGB")
-    image.save("output.bmp")
+    np.save("bp_raw_" + "output.npy", reconstructed_image)

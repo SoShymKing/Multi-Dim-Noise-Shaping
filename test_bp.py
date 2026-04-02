@@ -12,7 +12,7 @@ def main(image_path="sample.jpg", dsm_workers=12):
     
     elapsed_time = time.perf_counter() - start_time
     print(f"Total dsm time: {elapsed_time:.2f} seconds")
-    simple_preview_print_bp.raw_dsm_print(image_path, maximum, dim, bit)
+    simple_preview_print_bp.preview_dsm_print(image_path, maximum, dim, bit)
 
     elapsed_time = time.perf_counter() - start_time
     print(f"Total elapsed time: {elapsed_time:.2f} seconds")
