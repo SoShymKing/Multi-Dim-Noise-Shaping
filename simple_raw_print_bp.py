@@ -14,10 +14,12 @@ def raw_dsm_print(image_path, maximum=255, dim=2, bit=3):
     print(f"Image as NumPy array shape: {loaded_array.shape}")
 
     reconstructed_image = np.zeros_like(loaded_array, dtype=np.float64)
+    _local_max = 0
     for i in range(bit):
-        local_max = maximum/np.power(2,bit-1-i)
+        local_max = maximum/np.power(2, bit-1-i) # - ((maximum/np.power(2, bit-i)) if i>0 else 0)
+        # _local_max += local_max
         reconstructed_image += ((loaded_array >> i) & 1) * local_max
-
+    # reconstructed_image = maximum * reconstructed_image / _local_max
     reconstructed_image = np.clip(np.rint(reconstructed_image), 0, 255).astype(np.uint8)
     print(f"Raw image mul shape: {reconstructed_image.shape}, dtype: {reconstructed_image.dtype}")
     image = Image.fromarray(reconstructed_image, mode="RGB")

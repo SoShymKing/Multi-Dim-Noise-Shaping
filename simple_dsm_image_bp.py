@@ -55,7 +55,7 @@ def dsm_conv_image_modulation(image_path, order=1, bit=3):
 
     dim = 2
     image_array = np.array(image, dtype=np.float64)
-    maximum = float(np.max(image_array))
+    maximum = 256  # float(np.max(image_array))
 
     working_array = image_array.copy()
     img = [None] * bit
@@ -65,7 +65,8 @@ def dsm_conv_image_modulation(image_path, order=1, bit=3):
         working_array -= img[i]
         img[i] /= local_max 
         img[i] = np.float_power(img[i], 1 / dim) 
-    img[bit-1] = image_array/maximum
+    img[bit-1] = working_array/maximum
+    img[bit-1] = np.float_power(img[bit-1], 1 / dim)
 
     print(f"maximum: {maximum}")
     return_dtype = _packed_dtype(bit)
