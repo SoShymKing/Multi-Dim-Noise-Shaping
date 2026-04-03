@@ -2,8 +2,9 @@ from pathlib import Path
 from typing import cast
 
 import numpy as np
-from PIL import Image, ImageFilter
+from PIL import Image
 from numpy.typing import NDArray
+from scipy.ndimage import gaussian_filter
 
 
 def _default_packed_input_path(image_path: str) -> str:
@@ -15,30 +16,39 @@ def _default_output_path(image_path: str) -> str:
     return f"output_preview_bp_{stem}.bmp"
 
 
-def _blur_plane(plane: NDArray[np.float64], radius: float) -> NDArray[np.float64]:
+def _blur_image(image: NDArray[np.float64], radius: float) -> NDArray[np.float64]:
     if radius <= 0:
-        return plane.astype(np.float64)
+        return image.astype(np.float64)
 
-    blurred: NDArray[np.float64] = np.empty_like(plane, dtype=np.float64)
-    channel_count = cast(int, plane.shape[2])
+    blurred: NDArray[np.float64] = np.empty_like(image, dtype=np.float64)
+    channel_count = cast(int, image.shape[2])
+    sigma = float(radius)
     for channel in range(channel_count):
-        grayscale = Image.fromarray(
-            np.rint(np.clip(plane[:, :, channel], 0.0, 1.0) * 255.0).astype(np.uint8),
-            mode="L",
-        )
-        filtered = grayscale.filter(ImageFilter.GaussianBlur(radius=radius))
-        blurred[:, :, channel] = np.asarray(filtered, dtype=np.float64) / 255.0
+        blurred[:, :, channel] = gaussian_filter(image[:, :, channel], sigma=sigma, mode="nearest")
     return blurred
+
+
+def _matched_weight_sum(
+    loaded_array: NDArray[np.uint64],
+    maximum: float,
+    bit: int,
+) -> NDArray[np.float64]:
+    reconstructed_image: NDArray[np.float64] = np.zeros_like(loaded_array, dtype=np.float64)
+    for index in range(bit):
+        exponent = int(bit - 1 - index)
+        local_max: float = maximum / float(2 ** exponent)
+        bit_plane: NDArray[np.float64] = ((loaded_array >> index) & 1).astype(np.float64)
+        reconstructed_image += bit_plane * local_max
+    return reconstructed_image
 
 
 def preview_dsm_print(
     image_path: str,
     maximum: float = 256,
     bit: int = 3,
-    blur_radius: float = 1.5,
+    blur_radius: float = 4.0,
     packed_input_path: str | None = None,
     output_image_path: str | None = None,
-    avoid_clip: bool = True,
 ) -> str:
     if bit < 1:
         raise ValueError("bit must be at least 1")
@@ -52,20 +62,19 @@ def preview_dsm_print(
 
     print(f"Preview input shape: {loaded_array.shape}, dtype: {loaded_array.dtype}")
 
-    reconstructed_image: NDArray[np.float64] = np.zeros_like(loaded_array, dtype=np.float64)
-    for index in range(bit):
-        local_max = maximum / (2 ** (bit - 1 - index))
-        bit_plane: NDArray[np.float64] = ((loaded_array >> index) & 1).astype(np.float64)
-        preview_plane = _blur_plane(bit_plane, blur_radius)
-        reconstructed_image += preview_plane * local_max
+    reconstructed_image: NDArray[np.float64] = _matched_weight_sum(loaded_array, maximum, bit)
 
-    if avoid_clip:
-        current_maximum = float(np.max(reconstructed_image))
-        if current_maximum > 255.0:
-            reconstructed_image *= 255.0 / current_maximum
+    preview_image = _blur_image(reconstructed_image, blur_radius)
+    current_maximum = float(np.max(preview_image))
+    if current_maximum > 0.0:
+        preview_image *= 255.0 / current_maximum
+    scaled_maximum = float(np.max(preview_image))
 
-    final_image: NDArray[np.uint8] = np.clip(np.rint(reconstructed_image), 0, 255).astype(np.uint8)
+    final_image: NDArray[np.uint8] = np.clip(np.rint(preview_image), 0, 255).astype(np.uint8)
     print(f"Preview image shape: {final_image.shape}, dtype: {final_image.dtype}")
+    print(f"Preview blur radius used: {blur_radius:.3f}")
+    print(f"Preview max before scaling: {current_maximum:.3f}")
+    print(f"Preview max after scaling: {scaled_maximum:.3f}")
 
     output_path = output_image_path or _default_output_path(image_path)
     Image.fromarray(final_image, mode="RGB").save(output_path)
