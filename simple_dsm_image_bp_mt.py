@@ -1,32 +1,36 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import math
-import os
-
+import importlib.util
+from pathlib import Path
 from PIL import Image
 import numpy as np
 from numpy.typing import NDArray
+from typing import Callable, Protocol, TypeAlias, cast
 
 
-def _resolve_worker_count(max_workers: int | None, task_count: int) -> int:
-    if task_count <= 0:
-        return 1
-
-    if max_workers is None:
-        requested_workers = os.cpu_count() or 1
-    elif type(max_workers) is int and max_workers >= 1:
-        requested_workers = max_workers
-    else:
-        raise ValueError("max_workers must be a positive integer or None")
-
-    return max(1, min(requested_workers, task_count))
+DTypeLike: TypeAlias = np.dtype[np.generic] | type[np.generic]
 
 
-def _build_ranges(axis_length: int, worker_count: int) -> list[tuple[int, int]]:
-    chunk_size = max(1, math.ceil(axis_length / worker_count))
-    return [
-        (start, min(axis_length, start + chunk_size))
-        for start in range(0, axis_length, chunk_size)
-    ]
+class _ApplyBatchFn(Protocol):
+    def __call__(
+        self,
+        array: NDArray[np.float64],
+        axis: int,
+        batch_processor: Callable[..., np.ndarray],
+        *,
+        output_dtype: DTypeLike,
+        max_workers: int | None = None,
+        batch_args: tuple[object, ...] = (),
+    ) -> np.ndarray: ...
+
+
+_COMMON_SPEC = importlib.util.spec_from_file_location(
+    "dsm_mt_common",
+    Path(__file__).with_name("dsm_mt_common.py"),
+)
+if _COMMON_SPEC is None or _COMMON_SPEC.loader is None:
+    raise ImportError("Unable to load dsm_mt_common.py")
+_COMMON_MODULE = importlib.util.module_from_spec(_COMMON_SPEC)
+_COMMON_SPEC.loader.exec_module(_COMMON_MODULE)
+apply_batch_along_axis_parallel = cast(_ApplyBatchFn, _COMMON_MODULE.apply_batch_along_axis_parallel)
 
 
 def _dsm_batch(signals: NDArray[np.float64], order: int) -> NDArray[np.uint8]:
@@ -46,54 +50,6 @@ def _dsm_batch(signals: NDArray[np.float64], order: int) -> NDArray[np.uint8]:
         output[index] = quantized
 
     return output
-
-
-def _dsm_chunk_job(
-    reshaped: NDArray[np.float64],
-    start_index: int,
-    end_index: int,
-    order: int,
-) -> tuple[int, int, NDArray[np.uint8]]:
-    chunk_output = _dsm_batch(reshaped[:, start_index:end_index], order)
-    return start_index, end_index, chunk_output
-
-
-def _apply_dsm_along_axis_parallel(
-    array: NDArray[np.float64],
-    axis: int,
-    order: int,
-    max_workers: int | None = None,
-) -> NDArray[np.uint8]:
-    moved = np.moveaxis(array, axis, 0)
-    reshaped = moved.reshape(moved.shape[0], -1)
-    output = np.zeros_like(reshaped, dtype=np.uint8)
-
-    worker_count = _resolve_worker_count(max_workers, reshaped.shape[1])
-    index_ranges = _build_ranges(reshaped.shape[1], worker_count)
-
-    if worker_count == 1:
-        output[:, :] = _dsm_batch(reshaped, order)
-    else:
-        with ThreadPoolExecutor(max_workers=worker_count) as executor:
-            futures = [
-                executor.submit(
-                    _dsm_chunk_job,
-                    reshaped,
-                    start_index,
-                    end_index,
-                    order,
-                )
-                for start_index, end_index in index_ranges
-            ]
-
-            for future in as_completed(futures):
-                start_index, end_index, chunk_output = future.result()
-                output[:, start_index:end_index] = chunk_output
-
-    restored = output.reshape(moved.shape)
-    return np.moveaxis(restored, 0, axis)
-
-
 def _packed_dtype(bit: int):
     if bit <= 8:
         return np.uint8
@@ -111,7 +67,7 @@ def dsm_conv_image_modulation(
     order: int = 1,
     bit: int = 3,
     max_workers: int | None = None,
-) -> tuple[int, int, int]:
+) -> tuple[float, int, int]:
     if bit < 1:
         raise ValueError("bit must be at least 1")
 
@@ -140,8 +96,22 @@ def dsm_conv_image_modulation(
 
     for i in range(bit):
         bit_plane = img[i].astype(np.float64)
-        w_array = _apply_dsm_along_axis_parallel(bit_plane, axis=0, order=order, max_workers=max_workers)
-        h_array = _apply_dsm_along_axis_parallel(bit_plane, axis=1, order=order, max_workers=max_workers)
+        w_array = apply_batch_along_axis_parallel(
+            bit_plane,
+            axis=0,
+            batch_processor=_dsm_batch,
+            output_dtype=np.uint8,
+            max_workers=max_workers,
+            batch_args=(order,),
+        )
+        h_array = apply_batch_along_axis_parallel(
+            bit_plane,
+            axis=1,
+            batch_processor=_dsm_batch,
+            output_dtype=np.uint8,
+            max_workers=max_workers,
+            batch_args=(order,),
+        )
         mul_array = w_array * h_array
         rt_array |= mul_array.astype(return_dtype) << i
 

@@ -1,32 +1,36 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import math
-import os
-
+import importlib.util
+from pathlib import Path
 from PIL import Image
 import numpy as np
 from numpy.typing import NDArray
+from typing import Callable, Protocol, TypeAlias, cast
 
 
-def _resolve_worker_count(max_workers, task_count):
-    if task_count <= 0:
-        return 1
-
-    if max_workers is None:
-        requested_workers = os.cpu_count() or 1
-    elif isinstance(max_workers, int) and max_workers >= 1:
-        requested_workers = max_workers
-    else:
-        raise ValueError("max_workers must be a positive integer or None")
-
-    return max(1, min(requested_workers, task_count))
+DTypeLike: TypeAlias = np.dtype[np.generic] | type[np.generic]
 
 
-def _build_ranges(axis_length, worker_count):
-    chunk_size = max(1, math.ceil(axis_length / worker_count))
-    return [
-        (start, min(axis_length, start + chunk_size))
-        for start in range(0, axis_length, chunk_size)
-    ]
+class _ApplyBatchFn(Protocol):
+    def __call__(
+        self,
+        array: NDArray[np.float64],
+        axis: int,
+        batch_processor: Callable[..., np.ndarray],
+        *,
+        output_dtype: DTypeLike,
+        max_workers: int | None = None,
+        batch_args: tuple[object, ...] = (),
+    ) -> np.ndarray: ...
+
+
+_COMMON_SPEC = importlib.util.spec_from_file_location(
+    "dsm_mt_common",
+    Path(__file__).with_name("dsm_mt_common.py"),
+)
+if _COMMON_SPEC is None or _COMMON_SPEC.loader is None:
+    raise ImportError("Unable to load dsm_mt_common.py")
+_COMMON_MODULE = importlib.util.module_from_spec(_COMMON_SPEC)
+_COMMON_SPEC.loader.exec_module(_COMMON_MODULE)
+apply_batch_along_axis_parallel = cast(_ApplyBatchFn, _COMMON_MODULE.apply_batch_along_axis_parallel)
 
 
 def _packed_dtype(bit: int):
@@ -41,7 +45,12 @@ def _packed_dtype(bit: int):
     raise ValueError("bit must be 64 or less")
 
 
-def _mdsm_batch(signals: NDArray[np.float64], order: int, bit: int, output_dtype) -> NDArray:
+def _mdsm_batch(
+    signals: NDArray[np.float64],
+    order: int,
+    bit: int,
+    output_dtype: DTypeLike,
+) -> np.ndarray:
     if order < 1:
         raise ValueError("order must be at least 1")
     if bit < 1:
@@ -62,49 +71,12 @@ def _mdsm_batch(signals: NDArray[np.float64], order: int, bit: int, output_dtype
         output[index] = quantized.astype(output_dtype)
 
     return output
-
-
-def _mdsm_chunk_job(reshaped, start_index, end_index, order, bit, output_dtype):
-    chunk_output = _mdsm_batch(reshaped[:, start_index:end_index], order, bit, output_dtype)
-    return start_index, end_index, chunk_output
-
-
-def _apply_mdsm_along_axis_parallel(array: NDArray[np.float64], axis: int, order: int, bit: int, output_dtype, max_workers=None) -> NDArray:
-    moved = np.moveaxis(array, axis, 0)
-    reshaped = moved.reshape(moved.shape[0], -1)
-    output = np.zeros_like(reshaped, dtype=output_dtype)
-
-    worker_count = _resolve_worker_count(max_workers, reshaped.shape[1])
-    index_ranges = _build_ranges(reshaped.shape[1], worker_count)
-
-    if worker_count == 1:
-        output[:, :] = _mdsm_batch(reshaped, order, bit, output_dtype)
-    else:
-        with ThreadPoolExecutor(max_workers=worker_count) as executor:
-            futures = [
-                executor.submit(
-                    _mdsm_chunk_job,
-                    reshaped,
-                    start_index,
-                    end_index,
-                    order,
-                    bit,
-                    output_dtype,
-                )
-                for start_index, end_index in index_ranges
-            ]
-
-            for future in as_completed(futures):
-                start_index, end_index, chunk_output = future.result()
-                output[:, start_index:end_index] = chunk_output
-
-    restored = output.reshape(moved.shape)
-    return np.moveaxis(restored, 0, axis)
-
-
-def dsm_conv_image_modulation(image_path, order=1, channel_bit=3, max_workers=None):
-    if not isinstance(channel_bit, int):
-        raise ValueError("bit must be an integer")
+def dsm_conv_image_modulation(
+    image_path: str,
+    order: int = 1,
+    channel_bit: int = 3,
+    max_workers: int | None = None,
+) -> tuple[float, int, int]:
     if channel_bit < 1:
         raise ValueError("bit must be at least 1")
     if order < 1:
@@ -126,23 +98,23 @@ def dsm_conv_image_modulation(image_path, order=1, channel_bit=3, max_workers=No
 
     print(f"Image as NumPy array shape: {normalized_image.shape}, dtype: {normalized_image.dtype}")
 
-    w_array = _apply_mdsm_along_axis_parallel(
+    w_array = apply_batch_along_axis_parallel(
         normalized_image,
         axis=0,
-        order=order,
-        bit=channel_bit,
+        batch_processor=_mdsm_batch,
         output_dtype=packed_dtype,
         max_workers=max_workers,
+        batch_args=(order, channel_bit, packed_dtype),
     )
     print("Image as w array done.")
 
-    h_array = _apply_mdsm_along_axis_parallel(
+    h_array = apply_batch_along_axis_parallel(
         normalized_image,
         axis=1,
-        order=order,
-        bit=channel_bit,
+        batch_processor=_mdsm_batch,
         output_dtype=packed_dtype,
         max_workers=max_workers,
+        batch_args=(order, channel_bit, packed_dtype),
     )
     print("Image as h array done.")
 

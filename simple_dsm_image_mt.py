@@ -1,168 +1,99 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import math
-import os
-
+import importlib.util
+from pathlib import Path
 from PIL import Image
 import numpy as np
+from numpy.typing import NDArray
+from typing import Callable, Protocol, TypeAlias, cast
 
 
-def _resolve_worker_count(max_workers, axis_length):
-    if axis_length <= 0:
-        return 1
-
-    if max_workers is None:
-        requested_workers = os.cpu_count() or 1
-    else:
-        requested_workers = max_workers
-
-    return max(1, min(requested_workers, axis_length))
+DTypeLike: TypeAlias = np.dtype[np.generic] | type[np.generic]
 
 
-def _build_ranges(axis_length, worker_count):
-    chunk_size = max(1, math.ceil(axis_length / worker_count))
-    return [
-        (start, min(axis_length, start + chunk_size))
-        for start in range(0, axis_length, chunk_size)
-    ]
+class _ApplyBatchFn(Protocol):
+    def __call__(
+        self,
+        array: NDArray[np.float64],
+        axis: int,
+        batch_processor: Callable[..., np.ndarray],
+        *,
+        output_dtype: DTypeLike,
+        max_workers: int | None = None,
+        batch_args: tuple[object, ...] = (),
+    ) -> np.ndarray: ...
 
 
-def _horizontal_pass_chunk(sqrt_image_array, channel, start_column, end_column, convert_w, order):
-    w_chunk = np.zeros((convert_w, end_column - start_column), dtype=np.int8)
-
-    for local_column, column in enumerate(range(start_column, end_column)):
-        integrator = [0.0] * order
-        for row in range(convert_w):
-            integrator[0] += sqrt_image_array[row, column, channel]
-            
-            for level in range(1, order):
-                integrator[level] += integrator[level - 1]
-                
-            y = 1 if integrator[order-1] >= 0 else 0
-            
-            for level in range(0, order):
-                integrator[level] -= y
-                
-            w_chunk[row, local_column] = y
-
-    return channel, start_column, end_column, w_chunk
+_COMMON_SPEC = importlib.util.spec_from_file_location(
+    "dsm_mt_common",
+    Path(__file__).with_name("dsm_mt_common.py"),
+)
+if _COMMON_SPEC is None or _COMMON_SPEC.loader is None:
+    raise ImportError("Unable to load dsm_mt_common.py")
+_COMMON_MODULE = importlib.util.module_from_spec(_COMMON_SPEC)
+_COMMON_SPEC.loader.exec_module(_COMMON_MODULE)
+apply_batch_along_axis_parallel = cast(_ApplyBatchFn, _COMMON_MODULE.apply_batch_along_axis_parallel)
 
 
-def _vertical_pass_chunk(sqrt_image_array, channel, start_row, end_row, convert_h, order):
-    h_chunk = np.zeros((end_row - start_row, convert_h), dtype=np.int8)
+def _dsm_batch(signals: NDArray[np.float64], order: int) -> NDArray[np.int8]:
+    if order < 1:
+        raise ValueError("order must be at least 1")
 
-    for local_row, row in enumerate(range(start_row, end_row)):
-        integrator = [0.0] * order
-        for column in range(convert_h):
-            integrator[0] += sqrt_image_array[row, column, channel]
-            
-            for level in range(1, order):
-                integrator[level] += integrator[level - 1]
-            
-            y = 1 if integrator[order-1] >= 0 else 0
+    integrator = np.zeros((order, signals.shape[1]), dtype=np.float64)
+    output = np.zeros(signals.shape, dtype=np.int8)
 
-            for level in range(0, order):
-                integrator[level] -= y
+    for index in range(signals.shape[0]):
+        integrator[0] += signals[index]
+        for level in range(1, order):
+            integrator[level] += integrator[level - 1]
 
-            h_chunk[local_row, column] = y
+        quantized = (integrator[order - 1] >= 0).astype(np.int8)
+        integrator -= quantized
+        output[index] = quantized
 
-    return channel, start_row, end_row, h_chunk
-
-
-def _compute_horizontal_pass(sqrt_image_array, image_width, convert_w, order, max_workers):
-    worker_count = _resolve_worker_count(max_workers, image_width)
-    column_ranges = _build_ranges(image_width, worker_count)
-    w_array = np.zeros((convert_w, image_width, 3), dtype=np.int8)
-
-    with ThreadPoolExecutor(max_workers=worker_count) as executor:
-        futures = [
-            executor.submit(
-                _horizontal_pass_chunk,
-                sqrt_image_array,
-                channel,
-                start_column,
-                end_column,
-                convert_w,
-                order,
-            )
-            for channel in range(3)
-            for start_column, end_column in column_ranges
-        ]
-
-        for future in as_completed(futures):
-            channel, start_column, end_column, w_chunk = future.result()
-            w_array[:, start_column:end_column, channel] = w_chunk
-
-    return w_array
-
-
-def _compute_vertical_pass(sqrt_image_array, image_height, convert_h, order, max_workers):
-    worker_count = _resolve_worker_count(max_workers, image_height)
-    row_ranges = _build_ranges(image_height, worker_count)
-    h_array = np.zeros((image_height, convert_h, 3), dtype=np.int8)
-
-    with ThreadPoolExecutor(max_workers=worker_count) as executor:
-        futures = [
-            executor.submit(
-                _vertical_pass_chunk,
-                sqrt_image_array,
-                channel,
-                start_row,
-                end_row,
-                convert_h,
-                order,
-            )
-            for channel in range(3)
-            for start_row, end_row in row_ranges
-        ]
-
-        for future in as_completed(futures):
-            channel, start_row, end_row, h_chunk = future.result()
-            h_array[start_row:end_row, :, channel] = h_chunk
-
-    return h_array
-
-
-def dsm_conv_image_modulation(image_path, order=1, max_workers=None):
+    return output
+def dsm_conv_image_modulation(
+    image_path: str,
+    order: int = 1,
+    max_workers: int | None = None,
+) -> tuple[float, float, int]:
     image = Image.open(image_path)
     print(f"Image size: {image.size}, mode: {image.mode}")
 
-    convert_h = image.size[0]
-    convert_w = image.size[1]
+    image_width = image.size[0]
+    image_height = image.size[1]
     dim = 2
 
-    image_array = np.array(image, dtype=np.float64)
+    image_array = np.asarray(image, dtype=np.float64)
     image_array = np.float_power(image_array, 1 / dim)
-    maximum = np.max(image_array)
-    median = (np.max(image_array) + np.min(image_array)) / 2
-    image_array = image_array / maximum
-    sqrt_image_array = image_array
+    maximum = float(np.max(image_array))
+    median = float((np.max(image_array) + np.min(image_array)) / 2)
+    sqrt_image_array = image_array / maximum
 
     print(f"maximum: {maximum}")
     print(f"Image as NumPy array shape: {sqrt_image_array.shape}, dtype: {sqrt_image_array.dtype}")
 
-    w_array = _compute_horizontal_pass(
-        sqrt_image_array=sqrt_image_array,
-        image_width=image.size[0],
-        convert_w=convert_w,
-        order=order,
+    w_array = apply_batch_along_axis_parallel(
+        sqrt_image_array,
+        axis=0,
+        batch_processor=_dsm_batch,
+        output_dtype=np.int8,
         max_workers=max_workers,
+        batch_args=(order,),
     )
     print(f"w_array shape: {w_array.shape}, dtype: {w_array.dtype}")
 
-    h_array = _compute_vertical_pass(
-        sqrt_image_array=sqrt_image_array,
-        image_height=image.size[1],
-        convert_h=convert_h,
-        order=order,
+    h_array = apply_batch_along_axis_parallel(
+        sqrt_image_array,
+        axis=1,
+        batch_processor=_dsm_batch,
+        output_dtype=np.int8,
         max_workers=max_workers,
+        batch_args=(order,),
     )
     print(f"h_array shape: {h_array.shape}, dtype: {h_array.dtype}")
 
-    row_indices = np.arange(convert_w)
-    column_indices = np.arange(convert_h)
-    mul_array = (
-        w_array[:, column_indices, :] * h_array[row_indices, :, :]
-    ).astype(np.int8)
+    row_indices = np.arange(image_height)
+    column_indices = np.arange(image_width)
+    mul_array = (w_array[:, column_indices, :] * h_array[row_indices, :, :]).astype(np.int8)
 
     np.save("mul_array_" + image_path + ".npy", mul_array)
     print(f"mul_array shape: {mul_array.shape}, dtype: {mul_array.dtype}")
