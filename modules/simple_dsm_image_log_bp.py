@@ -1,8 +1,8 @@
-from pathlib import Path
-
 from PIL import Image
 import numpy as np
 from numpy.typing import NDArray
+
+from modules.generated_output_paths import clean_bp_mul_array_path
 
 
 def _dsm_1d(signal: NDArray[np.float64], order: int) -> NDArray[np.uint8]:
@@ -49,7 +49,7 @@ def _packed_dtype(bit: int):
 
 
 def _default_packed_path(image_path: str) -> str:
-    return f"mul_array_clean_bp_{Path(image_path).name}.npy"
+    return clean_bp_mul_array_path(image_path)
 
 
 def dsm_conv_image_modulation(
@@ -69,15 +69,14 @@ def dsm_conv_image_modulation(
     maximum = float(np.max(image_array))
 
     working_array = image_array.copy()
-    img = [None] * bit
+    img: list[NDArray[np.float64]] = []
     for i in range(bit-1):
         local_max =  np.float_power(maximum,(i+1)/bit)
-        img[i] = working_array % (local_max)
-        working_array -= img[i]
-        img[i] /= local_max 
-        img[i] = np.float_power(img[i], 1 / dim) 
-    img[bit-1] = working_array/maximum
-    img[bit-1] = np.float_power(img[bit-1], 1 / dim)
+        current_plane = working_array % local_max
+        working_array -= current_plane
+        current_plane /= local_max
+        img.append(np.float_power(current_plane, 1 / dim))
+    img.append(np.float_power(working_array / maximum, 1 / dim))
 
     print(f"maximum: {maximum}")
     return_dtype = _packed_dtype(bit)

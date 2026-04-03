@@ -2,6 +2,8 @@ from PIL import Image
 import numpy as np
 from numpy.typing import NDArray
 
+from modules.generated_output_paths import mul_array_path
+
 
 def _dsm_1d(signal: NDArray[np.float64], order: int) -> NDArray[np.uint8]:
     if order < 1:
@@ -58,15 +60,14 @@ def dsm_conv_image_modulation(image_path, order=1, bit=3):
     maximum = float(np.max(image_array))
 
     working_array = image_array.copy()
-    img = [None] * bit
+    img: list[NDArray[np.float64]] = []
     for i in range(bit-1):
         local_max = maximum/np.power(2,bit-1-i)
-        img[i] = working_array % (local_max)
-        working_array -= img[i]
-        img[i] /= local_max 
-        img[i] = np.float_power(img[i], 1 / dim) 
-    img[bit-1] = working_array/maximum
-    img[bit-1] = np.float_power(img[bit-1], 1 / dim)
+        current_plane = working_array % local_max
+        working_array -= current_plane
+        current_plane /= local_max
+        img.append(np.float_power(current_plane, 1 / dim))
+    img.append(np.float_power(working_array / maximum, 1 / dim))
 
     print(f"maximum: {maximum}")
     return_dtype = _packed_dtype(bit)
@@ -81,6 +82,6 @@ def dsm_conv_image_modulation(image_path, order=1, bit=3):
         mul_array = w_array * h_array
         rt_array |= mul_array.astype(return_dtype) << i
 
-    np.save("mul_array_" + image_path + ".npy", rt_array)
+    np.save(mul_array_path(image_path), rt_array)
     print(f"mul_array shape: {rt_array.shape}, dtype: {rt_array.dtype}")
     return maximum, dim, bit

@@ -2,6 +2,8 @@ from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
 
+from modules.generated_output_paths import mul_array_path
+
 def dsm_conv_image_modulation(image_path, order=1):
     image = Image.open(image_path)
     print(f"Image size: {image.size}, mode: {image.mode}")
@@ -88,6 +90,6 @@ def dsm_conv_image_modulation(image_path, order=1):
         for j in range(convert_w):
             for i in range(convert_h):
                 mul_array[j, i, k] = (w_array[j, i, k] * h_array[j, i, k] )
-    np.save("mul_array_" + image_path + ".npy", mul_array)
+    np.save(mul_array_path(image_path), mul_array)
     print(f"mul_array shape: {mul_array.shape}, dtype: {mul_array.dtype}")
     return median, maximum, dim

@@ -1,12 +1,14 @@
 from PIL import Image
 import numpy as np
 
+from modules.generated_output_paths import default_output_bmp_path, mul_array_path
+
 
 def raw_dsm_print(image_path, maximum=255, dim=2, channel_bit=3):
     if channel_bit < 1:
         raise ValueError("bit must be at least 1")
 
-    loaded_array = np.load("mul_array_" + image_path + ".npy")
+    loaded_array = np.load(mul_array_path(image_path))
     if loaded_array.ndim != 3 or loaded_array.shape[2] != 3:
         raise ValueError("Loaded multi-bit array must have shape (height, width, 3)")
 
@@ -25,4 +27,4 @@ def raw_dsm_print(image_path, maximum=255, dim=2, channel_bit=3):
 
     print(f"Raw image mul shape: {reconstructed_image.shape}, dtype: {reconstructed_image.dtype}")
     image = Image.fromarray(reconstructed_image, mode="RGB")
-    image.save("output.bmp")
+    image.save(default_output_bmp_path())

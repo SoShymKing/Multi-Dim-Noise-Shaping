@@ -5,6 +5,8 @@ import os
 from PIL import Image
 import numpy as np
 
+from modules.generated_output_paths import default_output_bmp_path, mul_array_path
+
 
 def _resolve_worker_count(max_workers, axis_length):
     if axis_length <= 0:
@@ -33,7 +35,7 @@ def _reconstruct_chunk(loaded_array, start_index, end_index, scale_value):
 
 
 def raw_dsm_print(image_path, median=127, maximum=255, dim=2, max_workers=None):
-    loaded_array = np.load("mul_array_" + image_path + ".npy").astype(np.uint8)
+    loaded_array = np.load(mul_array_path(image_path)).astype(np.uint8)
     print(f"Image as NumPy array shape: {loaded_array.shape}")
 
     new_width = loaded_array.shape[0]
@@ -62,5 +64,5 @@ def raw_dsm_print(image_path, median=127, maximum=255, dim=2, max_workers=None):
 
     print(f"Raw image mul shape: {reconstructed_image.shape}, dtype: {reconstructed_image.dtype}")
     image = Image.fromarray(reconstructed_image, mode='RGB')
-    image.save("output.bmp")
+    image.save(default_output_bmp_path())
     # image.save("raw_image_mul_" + image_path + ".bmp")

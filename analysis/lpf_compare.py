@@ -1,8 +1,11 @@
 from argparse import ArgumentParser
 from pathlib import Path
+from typing import cast
 
 from PIL import Image, ImageFilter
 import numpy as np
+
+from modules.generated_output_paths import lpf_output_path
 
 
 def _load_rgb(image_path: str) -> np.ndarray:
@@ -22,7 +25,7 @@ def _apply_lpf_rgb(image_array: np.ndarray, radius: float) -> np.ndarray:
     return filtered_array
 
 
-def _metrics(reference: np.ndarray, target: np.ndarray) -> dict:
+def _metrics(reference: np.ndarray, target: np.ndarray) -> dict[str, object]:
     difference = reference - target
     absolute_difference = np.abs(difference)
     mse = float(np.mean(np.square(difference)))
@@ -64,7 +67,12 @@ def _save_rgb(image_array: np.ndarray, output_path: str) -> None:
     Image.fromarray(image_uint8, mode="RGB").save(output_path)
 
 
-def compare_images(image_a_path: str, image_b_path: str, radius: float = 1.5, save_outputs: bool = False) -> dict:
+def compare_images(
+    image_a_path: str,
+    image_b_path: str,
+    radius: float = 1.5,
+    save_outputs: bool = False,
+) -> dict[str, object]:
     image_a = _load_rgb(image_a_path)
     image_b = _load_rgb(image_b_path)
 
@@ -80,9 +88,9 @@ def compare_images(image_a_path: str, image_b_path: str, radius: float = 1.5, sa
     if save_outputs:
         stem_a = Path(image_a_path).stem
         stem_b = Path(image_b_path).stem
-        _save_rgb(filtered_a, f"{stem_a}_lpf.bmp")
-        _save_rgb(filtered_b, f"{stem_b}_lpf.bmp")
-        _save_rgb(np.abs(filtered_a - filtered_b), f"lpf_diff_{stem_a}_vs_{stem_b}.bmp")
+        _save_rgb(filtered_a, lpf_output_path(f"{stem_a}_lpf.bmp"))
+        _save_rgb(filtered_b, lpf_output_path(f"{stem_b}_lpf.bmp"))
+        _save_rgb(np.abs(filtered_a - filtered_b), lpf_output_path(f"lpf_diff_{stem_a}_vs_{stem_b}.bmp"))
 
     return metrics
 
@@ -108,7 +116,8 @@ def main() -> None:
     print(f"P95 abs error: {metrics['p95_abs_error']:.6f}")
     print(f"P99 abs error: {metrics['p99_abs_error']:.6f}")
 
-    for channel_name, channel_metrics in metrics["per_channel"].items():
+    per_channel = cast(dict[str, dict[str, float]], metrics["per_channel"])
+    for channel_name, channel_metrics in per_channel.items():
         print(
             f"{channel_name}: MAE={channel_metrics['mae']:.6f}, "
             f"MSE={channel_metrics['mse']:.6f}, "

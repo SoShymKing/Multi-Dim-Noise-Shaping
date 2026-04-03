@@ -1,15 +1,15 @@
-from pathlib import Path
-
 from PIL import Image
 import numpy as np
 
+from modules.generated_output_paths import clean_bp_mul_array_path, preview_output_path
+
 
 def _default_packed_path(image_path: str) -> str:
-    return f"mul_array_clean_bp_{Path(image_path).name}.npy"
+    return clean_bp_mul_array_path(image_path)
 
 
 def _default_output_path(image_path: str) -> str:
-    return f"output_clean_bp_{Path(image_path).stem}.bmp"
+    return preview_output_path("output_clean_bp", image_path)
 
 
 def raw_dsm_print(

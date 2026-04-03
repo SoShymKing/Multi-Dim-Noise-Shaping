@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import cast
 
 import numpy as np
@@ -6,14 +5,15 @@ from PIL import Image
 from numpy.typing import NDArray
 from scipy.ndimage import gaussian_filter
 
+from modules.generated_output_paths import mul_array_path, preview_output_path
+
 
 def _default_packed_input_path(image_path: str) -> str:
-    return "mul_array_" + image_path + ".npy"
+    return mul_array_path(image_path)
 
 
 def _default_output_path(image_path: str) -> str:
-    stem = Path(image_path).stem
-    return f"output_preview_bp_{stem}.bmp"
+    return preview_output_path("output_preview_bp", image_path)
 
 
 def _blur_image(image: NDArray[np.float64], radius: float) -> NDArray[np.float64]:

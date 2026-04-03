@@ -1,21 +1,20 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import math
 import os
-from pathlib import Path
-
 import numpy as np
 from numpy.typing import NDArray
 from PIL import Image
 from scipy.ndimage import gaussian_filter
 
+from modules.generated_output_paths import mul_array_path, preview_output_path
+
 
 def _default_packed_input_path(image_path: str) -> str:
-    return "mul_array_" + image_path + ".npy"
+    return mul_array_path(image_path)
 
 
 def _default_output_path(image_path: str) -> str:
-    stem = Path(image_path).stem
-    return f"output_preview_bp_mt_{stem}.bmp"
+    return preview_output_path("output_preview_bp_mt", image_path)
 
 
 def _resolve_worker_count(max_workers: int | None, task_count: int) -> int:

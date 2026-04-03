@@ -4,6 +4,8 @@ import os
 
 import numpy as np
 
+from modules.generated_output_paths import bp_raw_output_path, mul_array_path
+
 
 def _resolve_worker_count(max_workers, task_count: int) -> int:
     if task_count <= 0:
@@ -49,7 +51,7 @@ def raw_dsm_print(image_path, maximum=255, dim=2, bit=3, max_workers=None):
     if bit < 1:
         raise ValueError("bit must be at least 1")
 
-    loaded_array = np.load("mul_array_" + image_path + ".npy")
+    loaded_array = np.load(mul_array_path(image_path))
     if loaded_array.ndim != 3 or loaded_array.shape[2] != 3:
         raise ValueError("Loaded bit-plane array must have shape (height, width, 3)")
     if not np.issubdtype(loaded_array.dtype, np.integer):
@@ -81,4 +83,4 @@ def raw_dsm_print(image_path, maximum=255, dim=2, bit=3, max_workers=None):
                 reconstructed_image[start_index:end_index] = chunk
 
     print(f"Raw image mul shape: {reconstructed_image.shape}, dtype: {reconstructed_image.dtype}")
-    np.save("bp_raw_" + "output.npy", reconstructed_image)
+    np.save(bp_raw_output_path(), reconstructed_image)

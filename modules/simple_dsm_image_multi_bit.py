@@ -2,6 +2,8 @@ from PIL import Image
 import numpy as np
 from numpy.typing import NDArray
 
+from modules.generated_output_paths import mul_array_path
+
 def dsm_1d_multibit(signal, order, bit, output_dtype):
     if order < 1:
         raise ValueError("order must be at least 1")
@@ -24,7 +26,13 @@ def dsm_1d_multibit(signal, order, bit, output_dtype):
 
 
 
-def _apply_mdsm_along_axis(array: NDArray[np.float64], axis: int, order: int, bit: int, output_dtype) -> NDArray:
+def _apply_mdsm_along_axis(
+    array: NDArray[np.float64],
+    axis: int,
+    order: int,
+    bit: int,
+    output_dtype,
+) -> NDArray[np.generic]:
     moved = np.moveaxis(array, axis, 0)
     reshaped = moved.reshape(moved.shape[0], -1)
     output = np.zeros_like(reshaped, dtype=output_dtype)
@@ -81,6 +89,6 @@ def dsm_conv_image_modulation(image_path, order=1, channel_bit=3):
     rt_array = np.zeros_like(normalized_image, dtype=return_dtype)
     rt_array[:] = combined_array.astype(return_dtype)
 
-    np.save("mul_array_" + image_path + ".npy", rt_array)
+    np.save(mul_array_path(image_path), rt_array)
     print(f"mul_array shape: {rt_array.shape}, dtype: {rt_array.dtype}")
     return maximum, dim, channel_bit

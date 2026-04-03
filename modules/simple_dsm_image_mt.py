@@ -5,6 +5,8 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Callable, Protocol, TypeAlias, cast
 
+from modules.generated_output_paths import mul_array_path
+
 
 DTypeLike: TypeAlias = np.dtype[np.generic] | type[np.generic]
 
@@ -95,6 +97,6 @@ def dsm_conv_image_modulation(
     column_indices = np.arange(image_width)
     mul_array = (w_array[:, column_indices, :] * h_array[row_indices, :, :]).astype(np.int8)
 
-    np.save("mul_array_" + image_path + ".npy", mul_array)
+    np.save(mul_array_path(image_path), mul_array)
     print(f"mul_array shape: {mul_array.shape}, dtype: {mul_array.dtype}")
     return median, maximum, dim

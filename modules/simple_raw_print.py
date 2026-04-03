@@ -2,8 +2,10 @@ from PIL import Image
 import numpy as np
 import matplotlib.pyplot as plt
 
+from modules.generated_output_paths import default_output_bmp_path, mul_array_path
+
 def raw_dsm_print(image_path, median=127, maximum=255, dim=2):    
-    loaded_array = np.load("mul_array_" + image_path + ".npy").astype(np.uint8)
+    loaded_array = np.load(mul_array_path(image_path)).astype(np.uint8)
     print(f"Image as NumPy array shape: {loaded_array.shape}")
     new_width = loaded_array.shape[0]
     new_height = loaded_array.shape[1]
@@ -16,5 +18,5 @@ def raw_dsm_print(image_path, median=127, maximum=255, dim=2):
     np.clip(reconstructed_image, 0, 255, out=reconstructed_image)
     print(f"Raw image mul shape: {reconstructed_image.shape}, dtype: {reconstructed_image.dtype}")
     image = Image.fromarray(reconstructed_image, mode='RGB')
-    image.save("output.bmp")
+    image.save(default_output_bmp_path())
     # image.save("raw_image_mul_" + image_path + ".bmp")
