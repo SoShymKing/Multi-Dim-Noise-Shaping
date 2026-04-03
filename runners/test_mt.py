@@ -1,7 +1,12 @@
+import sys
 import time
+from pathlib import Path
+from typing import cast
 
-import simple_dsm_image_mt
-import simple_raw_print_mt
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from modules import simple_dsm_image_mt
+from modules import simple_raw_print_mt
 
 
 def main(image_path="sample.jpg", dsm_workers=12, raw_workers=12):
@@ -13,8 +18,8 @@ def main(image_path="sample.jpg", dsm_workers=12, raw_workers=12):
     )
     simple_raw_print_mt.raw_dsm_print(
         image_path,
-        median,
-        maximum,
+        cast(int, median),
+        cast(int, maximum),
         dim,
         max_workers=raw_workers,
     )

@@ -1,7 +1,11 @@
+import sys
 import time
+from pathlib import Path
 
-import simple_raw_print
-import simple_dsm_image
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from modules import simple_dsm_image
+from modules import simple_raw_print
 
 
 def main(image_path="sample.jpg", dsm_workers=12):
